@@ -9,6 +9,16 @@ A production-ready CMS and Public Catalog API for managing educational content.
 - **Worker (`worker`)**: Node.js Cron service. Handles scheduled publishing of lessons and programs.
 - **Database (`db`)**: PostgreSQL. Relational data model with strict constraints.
 
+```mermaid
+graph TD
+    Client[Client Browser] <-->|HTTP| Web[Frontend (Vite)]
+    Client <-->|HTTP| API[Backend API (Express)]
+    Web -->|API Calls| API
+    API <-->|SQL| DB[(PostgreSQL)]
+    Worker[Worker Service] <-->|SQL| DB
+    Worker -->|Check Schedulers| API
+```
+
 ## Prerequisites
 
 - Docker & Docker Compose
@@ -21,9 +31,10 @@ A production-ready CMS and Public Catalog API for managing educational content.
    docker compose up --build
    ```
    This starts:
-   - Web: http://localhost:5173
-   - API: http://localhost:3000
-   - DB: localhost:5432
+   This starts:
+   - **Web (Admin)**: http://localhost:5173
+   - **API (Public)**: http://localhost:3000
+   - **DB**: localhost:5432
 
 2. **Database Setup (Automatic)**:
    The repository includes migrations. However, if running fresh, you might need to run:

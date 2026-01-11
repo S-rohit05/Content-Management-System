@@ -82,7 +82,6 @@ export const LessonEditor: React.FC = () => {
                 }));
         }
 
-        console.log('Submitting payload:', payload); // Debug log
         updateMutation.mutate(payload);
     };
 

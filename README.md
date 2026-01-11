@@ -10,27 +10,28 @@ The system follows a 3-tier architecture with a specialized background worker fo
 
 ```mermaid
 graph TD
+    graph TD
     User((User))
-    Admin(("Admin/Editor"))
+    Admin((Admin / Editor))
 
-    subgraph "Frontend Layer"
-        WebClient["React Web App (Admin UI)"]
+    subgraph Frontend_Layer
+        WebClient[React Web App - Admin UI]
     end
 
-    subgraph "Backend Layer"
-        API["Express API Server"]
-        Worker["Background Worker (Cron)"]
+    subgraph Backend_Layer
+        API[Express API Server]
+        Worker[Background Worker - Cron]
     end
 
-    subgraph "Data Layer"
+    subgraph Data_Layer
         DB[(PostgreSQL)]
     end
 
     User -->|Views Public Catalog| API
     Admin -->|Manages Content| WebClient
     WebClient -->|Authenticated Requests| API
-    API -->|Reads/Writes| DB
-    Worker -->|Polls/Updates (Per Minute)| DB
+    API -->|Reads and Writes| DB
+    Worker -->|Polls and Updates per minute| DB
 ```
 
 ### Components

@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { formatDuration } from '../lib/utils';
 import { EditableText } from '../components/EditableText';
 import { AssetUploader } from '../components/AssetUploader';
+import { getProgramPoster, getLessonThumbnail } from '../lib/assetHelpers';
 
 export const ProgramDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -185,6 +186,24 @@ export const ProgramDetail: React.FC = () => {
                                 <option value="ARCHIVED" className="bg-slate-800 text-amber-400">ARCHIVED</option>
                             </select>
                         )}
+
+                        {['ADMIN'].includes(user?.role || '') && (
+                            <button
+                                onClick={async () => {
+                                    if (window.confirm('Are you sure you want to DELETE this entire program? This cannot be undone.')) {
+                                        try {
+                                            await api.delete(`/programs/${id}`);
+                                            window.location.href = '/programs';
+                                        } catch (e) {
+                                            alert('Failed to delete program');
+                                        }
+                                    }
+                                }}
+                                className="px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors ml-2"
+                            >
+                                Delete Program
+                            </button>
+                        )}
                     </div>
                     {/* Topics Display in Header */}
                     {program.topics && program.topics.length > 0 && (
@@ -278,7 +297,23 @@ export const ProgramDetail: React.FC = () => {
 
             {/* Basic Info Card */}
             <div className="glass-panel p-8 rounded-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none -mr-32 -mt-32" />
+                {/* Hero Background - Landscape Poster */}
+                {(() => {
+                    const heroUrl = getProgramPoster(program, 'LANDSCAPE', posterLanguage);
+                    if (heroUrl) {
+                        return (
+                            <>
+                                <div className="absolute inset-0 z-0">
+                                    <img src={heroUrl} alt="Hero" className="w-full h-full object-cover opacity-80 blur-sm scale-105" />
+                                    <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/60 to-slate-900/20" />
+                                </div>
+                            </>
+                        );
+                    }
+                    return (
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none -mr-32 -mt-32" />
+                    );
+                })()}
 
                 <h3 className="text-lg font-bold text-white mb-6 pb-4 border-b border-white/5 flex items-center gap-2">
                     <span className="w-1 h-5 bg-secondary rounded-full" />
@@ -287,7 +322,18 @@ export const ProgramDetail: React.FC = () => {
                 <div className="flex gap-8 items-start relative z-10">
                     <div className="flex-1 space-y-4">
 
-                        <div className="grid grid-cols-3 gap-4 mb-6">
+                        <div className="space-y-3 mb-8">
+                            <EditableText
+                                value={program.description}
+                                isEditing={['ADMIN', 'EDITOR'].includes(user?.role || '')}
+                                onSave={(val) => updateMutation.mutate({ description: val })}
+                                className="min-h-[80px] text-lg text-slate-200 leading-relaxed font-medium"
+                                rows={3}
+                                placeholder="Add a course overview..."
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-4">
                             <div className="bg-white/5 rounded-lg p-3 border border-white/5">
                                 <span className="block text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Duration</span>
                                 <span className="text-xl font-mono font-bold text-white">
@@ -305,24 +351,12 @@ export const ProgramDetail: React.FC = () => {
                                 </span>
                             </div>
                         </div>
-
-                        <div className="space-y-2">
-                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide ml-1">Description</label>
-                            <EditableText
-                                value={program.description}
-                                isEditing={['ADMIN', 'EDITOR'].includes(user?.role || '')}
-                                onSave={(val) => updateMutation.mutate({ description: val })}
-                                className="min-h-[120px]"
-                                rows={4}
-                                placeholder="Add a course overview..."
-                            />
-                        </div>
                     </div>
                 </div>
 
                 {/* Program Assets (Admin Only) */}
                 {['ADMIN', 'EDITOR'].includes(user?.role || '') && (
-                    <div className="mt-8 pt-8 border-t border-white/5">
+                    <div className="mt-8 pt-8 border-t border-white/5 relative z-10">
                         <div className="flex justify-between items-center mb-4">
                             <h4 className="text-sm font-bold text-white flex items-center gap-2">
                                 <span className="w-1 h-4 bg-purple-500 rounded-full" />
@@ -431,12 +465,17 @@ export const ProgramDetail: React.FC = () => {
                                         T{term.termNumber}
                                     </div>
                                     <div>
-                                        <h4 className="font-bold text-lg text-slate-200 select-none">
-                                            {term.title || `Term ${term.termNumber}`}
-                                        </h4>
-                                        <div className="text-xs text-slate-500 mt-0.5 font-medium flex items-center gap-2">
-                                            <span>{term.lessons?.length || 0} Lessons</span>
-                                            {expandedTerms[term.id] && <span className="w-1 h-1 rounded-full bg-slate-600"></span>}
+                                        <div onClick={(e) => e.stopPropagation()} className="font-bold text-lg text-slate-200">
+                                            <EditableText
+                                                value={term.title || `Term ${term.termNumber}`}
+                                                isEditing={['ADMIN', 'EDITOR'].includes(user?.role || '')}
+                                                onSave={(val) => updateTermMutation.mutate({ id: term.id, title: val })}
+                                                className="hover:bg-white/10 rounded px-2 -ml-2 transition-colors cursor-text"
+                                            />
+                                        </div>
+                                        <div className="text-xs text-slate-500 mt-1 font-medium flex items-center gap-2">
+                                            <span className="bg-white/5 px-2 py-0.5 rounded-full border border-white/5">{term.lessons?.length || 0} Lessons</span>
+                                            {expandedTerms[term.id] && <span className="text-[10px] text-primary font-bold tracking-wide uppercase">Active</span>}
                                         </div>
                                     </div>
                                 </div>
@@ -489,20 +528,19 @@ export const ProgramDetail: React.FC = () => {
                                                 <div className="absolute left-10 top-0 bottom-0 w-px bg-white/5 -z-10 group-hover/lesson:bg-white/10 transition-colors" />
 
                                                 <div className="flex items-center gap-5 flex-1">
-                                                    {/* Visual Hierarchy: Rectangle Thumbnail */}
-                                                    <div className="relative pl-12 flex items-center gap-4 flex-1">
-                                                        <div className="flex-shrink-0 w-24 aspect-video rounded-lg bg-white/5 overflow-hidden border border-white/10 relative">
+                                                    {/* Visual Hierarchy: Portrait Thumbnail (User Request) */}
+                                                    <div className="relative pl-6 flex items-center gap-4 flex-1">
+                                                        <div className="flex-shrink-0 w-16 aspect-[3/4] rounded-lg bg-white/5 overflow-hidden border border-white/10 relative shadow-sm">
                                                             {(() => {
-                                                                const thumb = lesson.assets?.find((a: any) => a.assetType === 'THUMBNAIL' && (a.variant === 'LANDSCAPE' || a.variant === 'SQAURE') && a.language === program.languagePrimary)
-                                                                    || lesson.assets?.find((a: any) => a.assetType === 'THUMBNAIL'); // Fallback to any thumbnail
+                                                                const thumbUrl = getLessonThumbnail(lesson, 'PORTRAIT', program.languagePrimary);
 
-                                                                if (thumb?.url) {
-                                                                    return <img src={thumb.url} alt={lesson.title || 'Lesson Thumbnail'} className="w-full h-full object-cover" />;
+                                                                if (thumbUrl) {
+                                                                    return <img src={thumbUrl} alt={lesson.title || 'Lesson Thumbnail'} className="w-full h-full object-cover" />;
                                                                 }
                                                                 // Fallback Icon if no thumbnail
                                                                 return (
-                                                                    <div className="w-full h-full flex items-center justify-center text-slate-500">
-                                                                        {lesson.contentType === 'VIDEO' ? '▶️' : '📄'}
+                                                                    <div className="w-full h-full flex items-center justify-center text-slate-500 bg-white/5">
+                                                                        <span className="text-xs">{lesson.contentType === 'VIDEO' ? '▶️' : '📄'}</span>
                                                                     </div>
                                                                 );
                                                             })()}

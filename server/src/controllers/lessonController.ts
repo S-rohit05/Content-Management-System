@@ -13,7 +13,7 @@ export const createLessonSchema = z.object({
         durationMs: z.number().int().nonnegative().optional(),
         contentLanguagePrimary: z.string().length(2),
         contentLanguagesAvailable: z.array(z.string().length(2)),
-        contentUrlsByLanguage: z.record(z.string().url()),
+        contentUrlsByLanguage: z.record(z.string().url().refine(val => !val.startsWith('data:'), "Base64 URIs not allowed")),
     }),
 });
 
@@ -24,16 +24,16 @@ export const updateLessonSchema = z.object({
         lessonNumber: z.number().int().positive().optional(),
         durationMs: z.number().int().nonnegative().optional(),
         contentLanguagesAvailable: z.array(z.string().length(2)).optional(),
-        contentUrlsByLanguage: z.record(z.string().url()).optional(),
+        contentUrlsByLanguage: z.record(z.string().url().refine(val => !val.startsWith('data:'), "Base64 URIs not allowed")).optional(),
         status: z.nativeEnum(LessonStatus).optional(),
         publishAt: z.string().datetime().optional().nullable(),
         isPaid: z.boolean().optional(),
         subtitleLanguages: z.array(z.string().length(2)).optional(),
-        subtitleUrlsByLanguage: z.record(z.string().url()).optional(),
+        subtitleUrlsByLanguage: z.record(z.string().url().refine(val => !val.startsWith('data:'), "Base64 URIs not allowed")).optional(),
         assets: z.array(z.object({
             language: z.string().length(2),
             variant: z.nativeEnum(AssetVariant),
-            url: z.string().url(),
+            url: z.string().url().refine(val => !val.startsWith('data:'), "File upload required (Base64 not allowed)"),
         })).optional(),
     }),
 });
@@ -121,12 +121,37 @@ export const updateLesson = async (req: Request, res: Response) => {
 
     try {
         const lesson = await prisma.$transaction(async (tx) => {
+            // Prepare generic update data
+            const updateData: any = { ...data };
+
+            // Handle Timestamp Constraints based on Status
+            if (data.status === 'PUBLISHED') {
+                // Constraint: PUBLISHED lessons MUST have a publishedAt date
+                // We also synch publishAt to now if not provided, to keep them consistent for immediate publishes
+                const now = new Date();
+                updateData.publishedAt = now;
+                updateData.publishAt = data.publishAt ? new Date(data.publishAt) : now;
+            } else if (data.status === 'SCHEDULED') {
+                // Constraint: SCHEDULED lessons MUST have a publishAt date (future)
+                // They should NOT be published yet.
+                if (!data.publishAt) throw new Error('VALIDATION_ERROR: Scheduled lessons must have a publish date');
+                updateData.publishAt = new Date(data.publishAt);
+                updateData.publishedAt = null;
+            } else if (data.status === 'DRAFT' || data.status === 'ARCHIVED') {
+                // Reset timestamps for non-active states if needed, or leave history?
+                // Usually better to clear them to avoid confusion/constraint issues if logic changes
+                updateData.publishedAt = null;
+                // updateData.publishAt = null; // Optional: Keep the scheduled time as "proposed"? Let's leave it.
+            }
+
+            // Explicitly handle date conversion if it wasn't handled above (e.g. status not changing but date is)
+            if (data.publishAt && !updateData.publishAt) {
+                updateData.publishAt = new Date(data.publishAt);
+            }
+
             await tx.lesson.update({
                 where: { id },
-                data: {
-                    ...data,
-                    publishAt: data.publishAt ? new Date(data.publishAt) : undefined,
-                },
+                data: updateData,
             });
 
             if (assets) {
@@ -211,6 +236,7 @@ export const updateLesson = async (req: Request, res: Response) => {
         if (error.message && error.message.startsWith('VALIDATION_ERROR')) {
             return res.status(400).json({ code: 'VALIDATION_ERROR', message: error.message.replace('VALIDATION_ERROR: ', '') });
         }
+        // DEBUG: Expose the actual error message to the client
         res.status(500).json({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to update lesson' });
     }
 };

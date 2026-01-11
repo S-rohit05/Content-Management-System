@@ -8,6 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAuth } from '../context/AuthContext';
 import { LANGUAGES, getLanguageLabel } from '../lib/constants';
+import { getProgramPoster } from '../lib/assetHelpers';
 
 
 
@@ -202,9 +203,9 @@ export const ProgramsList: React.FC = () => {
                                     <div className="text-sm font-bold text-white flex items-center gap-3">
                                         <div className="w-12 aspect-[3/4] rounded-lg bg-white/5 flex items-center justify-center overflow-hidden border border-white/10 group-hover:border-primary/50 transition-colors relative">
                                             {(() => {
-                                                const poster = program.assets?.find((a: any) => a.assetType === 'POSTER' && a.variant === 'PORTRAIT' && a.language === program.languagePrimary);
-                                                return poster ? (
-                                                    <img src={poster.url} alt={program.title} className="w-full h-full object-cover" />
+                                                const posterUrl = getProgramPoster(program, 'PORTRAIT');
+                                                return posterUrl ? (
+                                                    <img src={posterUrl} alt={program.title} className="w-full h-full object-cover" />
                                                 ) : (
                                                     <div className="text-[8px] font-bold text-slate-500 uppercase">No Img</div>
                                                 );

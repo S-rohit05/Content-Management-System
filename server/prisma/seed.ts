@@ -1,259 +1,425 @@
-import { PrismaClient, Role, ProgramStatus, LessonStatus, ContentType, AssetVariant, ProgramAssetType, LessonAssetType } from '@prisma/client';
+import {
+    PrismaClient,
+    Role,
+    ProgramStatus,
+    LessonStatus,
+    ContentType,
+    AssetVariant,
+    ProgramAssetType,
+    LessonAssetType,
+} from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
-    console.log('🌱 Starting seed...');
+    console.log('🌱 Seeding database...');
 
-    // 0. Clean Database (Delete in correct order)
-    console.log('🧹 Cleaning database...');
-    try {
-        await prisma.lessonAsset.deleteMany();
-        console.log('Deleted LessonAssets');
-        await prisma.programAsset.deleteMany();
-        console.log('Deleted ProgramAssets');
-        await prisma.lesson.deleteMany();
-        console.log('Deleted Lessons');
-        await prisma.term.deleteMany();
-        console.log('Deleted Terms');
-        await prisma.program.deleteMany();
-        console.log('Deleted Programs');
-        await prisma.topic.deleteMany();
-        console.log('Deleted Topics');
-    } catch (e: any) {
-        console.error('❌ Error during cleanup:');
-        console.error(JSON.stringify(e, null, 2));
-        throw e;
-    }
-    // Users are kept or upserted
+    // ---------------------------------------------------------------------------
+    // CLEANUP
+    // ---------------------------------------------------------------------------
+    await prisma.lessonAsset.deleteMany();
+    await prisma.programAsset.deleteMany();
+    await prisma.lesson.deleteMany();
+    await prisma.term.deleteMany();
+    await prisma.program.deleteMany();
+    await prisma.topic.deleteMany();
 
-    // 1. Create Users
+    // ---------------------------------------------------------------------------
+    // USERS
+    // ---------------------------------------------------------------------------
     const password = await bcrypt.hash('password123', 10);
 
-    const admin = await prisma.user.upsert({
+    await prisma.user.upsert({
         where: { email: 'admin@example.com' },
         update: {},
         create: { email: 'admin@example.com', password, role: Role.ADMIN },
     });
 
-    const editor = await prisma.user.upsert({
+    await prisma.user.upsert({
         where: { email: 'editor@example.com' },
         update: {},
         create: { email: 'editor@example.com', password, role: Role.EDITOR },
     });
 
-    // Viewer
-    await prisma.user.upsert({
-        where: { email: 'viewer@example.com' },
-        update: {},
-        create: { email: 'viewer@example.com', password, role: Role.VIEWER },
-    });
+    // ---------------------------------------------------------------------------
+    // TOPICS
+    // ---------------------------------------------------------------------------
+    const csTopic = await prisma.topic.create({ data: { name: 'Computer Science' } });
+    const aiTopic = await prisma.topic.create({ data: { name: 'Artificial Intelligence' } });
+    const webTopic = await prisma.topic.create({ data: { name: 'Web Development' } });
 
-    // 2. Create Topics
-    const webDev = await prisma.topic.create({ data: { name: 'Web Development' } });
-    const arts = await prisma.topic.create({ data: { name: 'Arts & Media' } });
-
-    // 3. Program 1: Full Stack (Multi-Language)
-    console.log('Creating Program 1...');
-    const p1 = await prisma.program.create({
+    // ===========================================================================
+    // PROGRAM 1 — Computer Science Fundamentals
+    // ===========================================================================
+    const csProgram = await prisma.program.create({
         data: {
-            title: 'Full Stack Web Development',
-            description: 'Master React, Node.js, and Modern Web Architecture.',
+            title: 'Computer Science Fundamentals',
+            description:
+                'Learn the foundational concepts of algorithms, data structures, and computational thinking.',
             languagePrimary: 'en',
-            languagesAvailable: ['en', 'hi'],
+            languagesAvailable: ['en'],
             status: ProgramStatus.PUBLISHED,
+            updatedAt: new Date(Date.now() + 10000), // Force top sort
             publishedAt: new Date(),
-            topics: { connect: [{ id: webDev.id }] },
+            topics: { connect: [{ id: csTopic.id }] },
             assets: {
                 create: [
-                    { language: 'en', variant: AssetVariant.PORTRAIT, assetType: ProgramAssetType.POSTER, url: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=600&h=800&fit=crop' },
-                    { language: 'en', variant: AssetVariant.LANDSCAPE, assetType: ProgramAssetType.POSTER, url: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&h=600&fit=crop' },
-                    // Hindi Assets
-                    { language: 'hi', variant: AssetVariant.PORTRAIT, assetType: ProgramAssetType.POSTER, url: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&h=800&fit=crop' },
+                    {
+                        language: 'en',
+                        variant: AssetVariant.PORTRAIT,
+                        assetType: ProgramAssetType.POSTER,
+                        url: 'https://images.unsplash.com/photo-1515879218367-8466d910aaa4',
+                    },
+                    {
+                        language: 'en',
+                        variant: AssetVariant.LANDSCAPE,
+                        assetType: ProgramAssetType.POSTER,
+                        url: 'https://images.unsplash.com/photo-1518770660439-4636190af475',
+                    },
                 ],
             },
         },
     });
 
-    // P1 Term 1
-    const t1 = await prisma.term.create({
-        data: { programId: p1.id, termNumber: 1, title: 'Frontend Fundamentals', description: 'HTML, CSS, JS' },
+    const csTerm = await prisma.term.create({
+        data: { programId: csProgram.id, termNumber: 1, title: 'Algorithm Basics' },
     });
 
-    // P1 Term 1 Lessons
-    // L1: Published, Multi-lang
+    // Lesson 1: Big O (Multi-lang + Assets)
     await prisma.lesson.create({
         data: {
-            termId: t1.id,
+            termId: csTerm.id,
             lessonNumber: 1,
-            title: 'HTML Structure & Semantics',
+            title: 'Big O Notation',
+            description:
+                'Understand time and space complexity and how Big O notation evaluates algorithm efficiency.',
             contentType: ContentType.VIDEO,
-            durationMs: 900000, // 15 mins
+            durationMs: 720000,
             contentLanguagePrimary: 'en',
             contentLanguagesAvailable: ['en', 'hi'],
             contentUrlsByLanguage: {
-                en: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-                hi: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4'
+                en: 'https://www.youtube.com/watch?v=__vX2sjlpXU',
+                hi: 'https://www.youtube.com/watch?v=9TlHvipP5yA',
             },
             status: LessonStatus.PUBLISHED,
             publishedAt: new Date(),
             assets: {
                 create: [
-                    { language: 'en', variant: AssetVariant.PORTRAIT, assetType: LessonAssetType.THUMBNAIL, url: 'https://images.unsplash.com/photo-1621839673705-6617adf9e890?w=400&h=600&fit=crop' },
-                    { language: 'en', variant: AssetVariant.LANDSCAPE, assetType: LessonAssetType.THUMBNAIL, url: 'https://images.unsplash.com/photo-1542831371-29b0f74f9713?w=600&h=400&fit=crop' },
+                    {
+                        language: 'en',
+                        variant: AssetVariant.PORTRAIT,
+                        assetType: LessonAssetType.THUMBNAIL,
+                        url: 'https://images.unsplash.com/photo-1555949963-aa79dcee981c',
+                    },
+                    {
+                        language: 'en',
+                        variant: AssetVariant.LANDSCAPE,
+                        assetType: LessonAssetType.THUMBNAIL,
+                        url: 'https://images.unsplash.com/photo-1504639725590-34d0984388bd',
+                    },
                 ],
             },
         },
     });
 
-    // L2: Published, Single Lang
+    // Lesson 2: Sorting (Assets)
     await prisma.lesson.create({
         data: {
-            termId: t1.id,
+            termId: csTerm.id,
             lessonNumber: 2,
-            title: 'CSS Grid & Flexbox',
+            title: 'Sorting Algorithms',
+            description:
+                'Learn how common sorting algorithms work and compare their performance characteristics.',
             contentType: ContentType.VIDEO,
-            durationMs: 1200000, // 20 mins
+            durationMs: 900000,
             contentLanguagePrimary: 'en',
             contentLanguagesAvailable: ['en'],
-            contentUrlsByLanguage: { en: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4' },
+            contentUrlsByLanguage: {
+                en: 'https://www.youtube.com/watch?v=kgBjXUE_Nwc',
+            },
             status: LessonStatus.PUBLISHED,
             publishedAt: new Date(),
             assets: {
                 create: [
-                    { language: 'en', variant: AssetVariant.PORTRAIT, assetType: LessonAssetType.THUMBNAIL, url: 'https://images.unsplash.com/photo-1507721999472-8ed4421c4af2?w=400&h=600&fit=crop' },
-                    { language: 'en', variant: AssetVariant.LANDSCAPE, assetType: LessonAssetType.THUMBNAIL, url: 'https://images.unsplash.com/photo-1523474253046-8cd2748b5fd2?w=600&h=400&fit=crop' },
+                    {
+                        language: 'en',
+                        variant: AssetVariant.PORTRAIT,
+                        assetType: LessonAssetType.THUMBNAIL,
+                        url: 'https://plus.unsplash.com/premium_photo-1701113010437-1709c96aa539?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTN8fGFpJTIwbWx8ZW58MHx8MHx8fDA%3D'
+                    },
+                    {
+                        language: 'en',
+                        variant: AssetVariant.LANDSCAPE,
+                        assetType: LessonAssetType.THUMBNAIL,
+                        url: 'https://images.unsplash.com/photo-1526378722484-bd91ca387e72',
+                    },
                 ],
             },
         },
     });
 
-    // L3: Scheduled (Demo)
-    await prisma.lesson.create({
-        data: {
-            termId: t1.id,
-            lessonNumber: 3,
-            title: 'JavaScript Basics (Live in 2m)',
-            contentType: ContentType.VIDEO,
-            durationMs: 600000,
-            contentLanguagePrimary: 'en',
-            contentLanguagesAvailable: ['en'],
-            contentUrlsByLanguage: { en: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4' },
-            status: LessonStatus.SCHEDULED,
-            publishAt: new Date(Date.now() + 120000), // 2 mins
-            assets: {
-                create: [
-                    { language: 'en', variant: AssetVariant.PORTRAIT, assetType: LessonAssetType.THUMBNAIL, url: 'https://images.unsplash.com/photo-1579468118864-1b9ea3c0db4a?w=400&h=600&fit=crop' },
-                    { language: 'en', variant: AssetVariant.LANDSCAPE, assetType: LessonAssetType.THUMBNAIL, url: 'https://images.unsplash.com/photo-1579468118864-1b9ea3c0db4a?w=600&h=400&fit=crop' },
-                ],
-            },
-        },
+    const csTerm2 = await prisma.term.create({
+        data: { programId: csProgram.id, termNumber: 2, title: 'Advanced Data Structures' },
     });
 
-    // P1 Term 2
-    const t2 = await prisma.term.create({
-        data: { programId: p1.id, termNumber: 2, title: 'Backend API', description: 'Node & Express' },
-    });
-
-    // L4: Draft
+    // Scheduled Lesson (Demo: Publishes in 2 mins)
     await prisma.lesson.create({
         data: {
-            termId: t2.id,
+            termId: csTerm2.id,
             lessonNumber: 1,
-            title: 'Node.js Runtime',
-            contentType: ContentType.ARTICLE,
-            durationMs: 300000,
+            title: 'Self-Balancing Trees',
+            description: 'Introduction to AVL and Red-Black trees. This lesson is scheduled to go live soon.',
+            contentType: ContentType.VIDEO,
+            durationMs: 1200000,
             contentLanguagePrimary: 'en',
             contentLanguagesAvailable: ['en'],
-            contentUrlsByLanguage: { en: 'https://nodejs.org' },
-            status: LessonStatus.DRAFT,
+            contentUrlsByLanguage: {
+                en: 'https://www.youtube.com/watch?v=rcCn558_tx8',
+            },
+            status: LessonStatus.SCHEDULED,
+            publishAt: new Date(Date.now() + 120000), // 2 minutes from now
             assets: {
                 create: [
-                    { language: 'en', variant: AssetVariant.PORTRAIT, assetType: LessonAssetType.THUMBNAIL, url: 'https://images.unsplash.com/photo-1627398242454-45aa433ec778?w=400&h=600&fit=crop' },
-                    { language: 'en', variant: AssetVariant.LANDSCAPE, assetType: LessonAssetType.THUMBNAIL, url: 'https://images.unsplash.com/photo-1627398242454-45aa433ec778?w=600&h=400&fit=crop' },
-                ]
-            }
+                    {
+                        language: 'en',
+                        variant: AssetVariant.PORTRAIT,
+                        assetType: LessonAssetType.THUMBNAIL,
+                        url: 'https://images.unsplash.com/photo-1542831371-29b0f74f9713',
+                    },
+                    {
+                        language: 'en',
+                        variant: AssetVariant.LANDSCAPE,
+                        assetType: LessonAssetType.THUMBNAIL,
+                        url: 'https://images.unsplash.com/photo-1542831371-29b0f74f9713',
+                    },
+                ],
+            },
         },
     });
 
-
-    // 4. Program 2: Cinematography
-    console.log('Creating Program 2...');
-    const p2 = await prisma.program.create({
+    // ===========================================================================
+    // PROGRAM 2 — Applied AI & Machine Learning
+    // ===========================================================================
+    const aiProgram = await prisma.program.create({
         data: {
-            title: 'Cinematography Masterclass',
-            description: 'How to create a movie from script to screen.',
+            title: 'Applied AI & Machine Learning',
+            description:
+                'A hands-on introduction to machine learning concepts and neural networks.',
             languagePrimary: 'en',
             languagesAvailable: ['en'],
             status: ProgramStatus.PUBLISHED,
             publishedAt: new Date(),
-            topics: { connect: [{ id: arts.id }] },
+            topics: { connect: [{ id: aiTopic.id }] },
             assets: {
                 create: [
-                    { language: 'en', variant: AssetVariant.PORTRAIT, assetType: ProgramAssetType.POSTER, url: 'https://images.unsplash.com/photo-1485846234645-a62644f84728?w=600&h=800&fit=crop' },
-                    { language: 'en', variant: AssetVariant.LANDSCAPE, assetType: ProgramAssetType.POSTER, url: 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?w=800&h=600&fit=crop' },
+                    {
+                        language: 'en',
+                        variant: AssetVariant.PORTRAIT,
+                        assetType: ProgramAssetType.POSTER,
+                        url: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485',
+                    },
+                    {
+                        language: 'en',
+                        variant: AssetVariant.LANDSCAPE,
+                        assetType: ProgramAssetType.POSTER,
+                        url: 'https://plus.unsplash.com/premium_photo-1701113010437-1709c96aa539?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTN8fGFpJTIwbWx8ZW58MHx8MHx8fDA%3D',
+                    },
                 ],
             },
         },
     });
 
-    const p2t1 = await prisma.term.create({
-        data: { programId: p2.id, termNumber: 1, title: 'The Basics' },
+    const aiTerm = await prisma.term.create({
+        data: { programId: aiProgram.id, termNumber: 1, title: 'Neural Networks' },
     });
 
-    // L5
+    // Lesson 1: Perceptrons (Assets)
     await prisma.lesson.create({
         data: {
-            termId: p2t1.id,
+            termId: aiTerm.id,
             lessonNumber: 1,
-            title: 'Camera Angles',
+            title: 'Perceptrons',
+            description:
+                'Learn how perceptrons act as the building blocks of neural networks.',
+            contentType: ContentType.VIDEO,
+            durationMs: 750000,
+            contentLanguagePrimary: 'en',
+            contentLanguagesAvailable: ['en'],
+            contentUrlsByLanguage: {
+                en: 'https://www.youtube.com/watch?v=ntKn5TPHHAk',
+            },
+            status: LessonStatus.PUBLISHED,
+            publishedAt: new Date(),
+            assets: {
+                create: [
+                    {
+                        language: 'en',
+                        variant: AssetVariant.PORTRAIT,
+                        assetType: LessonAssetType.THUMBNAIL,
+                        url: 'https://images.unsplash.com/photo-1555255707-c07966088b7b',
+                    },
+                    {
+                        language: 'en',
+                        variant: AssetVariant.LANDSCAPE,
+                        assetType: LessonAssetType.THUMBNAIL,
+                        url: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d',
+                    },
+                ],
+            },
+        },
+    });
+
+    // Lesson 2: Backpropagation (Multi-lang + Assets)
+    await prisma.lesson.create({
+        data: {
+            termId: aiTerm.id,
+            lessonNumber: 2,
+            title: 'Backpropagation',
+            description:
+                'Understand how neural networks learn by propagating error gradients.',
+            contentType: ContentType.VIDEO,
+            durationMs: 950000,
+            contentLanguagePrimary: 'en',
+            contentLanguagesAvailable: ['en', 'hi'],
+            contentUrlsByLanguage: {
+                en: 'https://www.youtube.com/watch?v=Ilg3gGewQ5U',
+                hi: 'https://www.youtube.com/watch?v=QYlC3a2U6nU',
+            },
+            status: LessonStatus.PUBLISHED,
+            publishedAt: new Date(),
+            assets: {
+                create: [
+                    {
+                        language: 'en',
+                        variant: AssetVariant.PORTRAIT,
+                        assetType: LessonAssetType.THUMBNAIL,
+                        url: 'https://images.unsplash.com/photo-1507413245164-6160d8298b31',
+                    },
+                    {
+                        language: 'en',
+                        variant: AssetVariant.LANDSCAPE,
+                        assetType: LessonAssetType.THUMBNAIL,
+                        url: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d',
+                    },
+                ],
+            },
+        },
+    });
+
+    // ===========================================================================
+    // PROGRAM 3 — Modern Web Development
+    // ===========================================================================
+    const webProgram = await prisma.program.create({
+        data: {
+            title: 'Modern Web Development',
+            description:
+                'Learn how modern web applications are built using HTML, CSS, JavaScript, and frameworks.',
+            languagePrimary: 'en',
+            languagesAvailable: ['en'],
+            status: ProgramStatus.PUBLISHED,
+            publishedAt: new Date(),
+            topics: { connect: [{ id: webTopic.id }] },
+            assets: {
+                create: [
+                    {
+                        language: 'en',
+                        variant: AssetVariant.PORTRAIT,
+                        assetType: ProgramAssetType.POSTER,
+                        url: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085',
+                    },
+                    {
+                        language: 'en',
+                        variant: AssetVariant.LANDSCAPE,
+                        assetType: ProgramAssetType.POSTER,
+                        url: 'https://images.unsplash.com/photo-1517433456452-f9633a875f6f',
+                    },
+                ],
+            },
+        },
+    });
+
+    const webTerm = await prisma.term.create({
+        data: { programId: webProgram.id, termNumber: 1, title: 'Frontend Foundations' },
+    });
+
+    // Lesson 1: Web Basics (Assets)
+    await prisma.lesson.create({
+        data: {
+            termId: webTerm.id,
+            lessonNumber: 1,
+            title: 'How the Web Works',
+            description:
+                'Understand how browsers, servers, and HTTP work together to deliver web applications.',
             contentType: ContentType.VIDEO,
             durationMs: 600000,
             contentLanguagePrimary: 'en',
             contentLanguagesAvailable: ['en'],
-            contentUrlsByLanguage: { en: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4' },
+            contentUrlsByLanguage: {
+                en: 'https://www.youtube.com/watch?v=guvsH5OFizE',
+            },
             status: LessonStatus.PUBLISHED,
             publishedAt: new Date(),
             assets: {
                 create: [
-                    { language: 'en', variant: AssetVariant.PORTRAIT, assetType: LessonAssetType.THUMBNAIL, url: 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=400&h=600&fit=crop' },
-                    { language: 'en', variant: AssetVariant.LANDSCAPE, assetType: LessonAssetType.THUMBNAIL, url: 'https://images.unsplash.com/photo-1478720568477-152d9b164e63?w=600&h=400&fit=crop' },
+                    {
+                        language: 'en',
+                        variant: AssetVariant.PORTRAIT,
+                        assetType: LessonAssetType.THUMBNAIL,
+                        url: 'https://images.unsplash.com/photo-1547658719-da2b51169166',
+                    },
+                    {
+                        language: 'en',
+                        variant: AssetVariant.LANDSCAPE,
+                        assetType: LessonAssetType.THUMBNAIL,
+                        url: 'https://images.unsplash.com/photo-1547658719-da2b51169166',
+                    },
                 ],
             },
         },
     });
 
-    // L6
+    // Lesson 2: React Intro (Assets)
     await prisma.lesson.create({
         data: {
-            termId: p2t1.id,
+            termId: webTerm.id,
             lessonNumber: 2,
-            title: 'Lighting Setup',
+            title: 'Introduction to React',
+            description:
+                'Learn the basics of React and how component-based UIs are built.',
             contentType: ContentType.VIDEO,
-            durationMs: 800000,
+            durationMs: 840000,
             contentLanguagePrimary: 'en',
             contentLanguagesAvailable: ['en'],
-            contentUrlsByLanguage: { en: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4' },
+            contentUrlsByLanguage: {
+                en: 'https://www.youtube.com/watch?v=bMknfKXIFA8',
+            },
             status: LessonStatus.PUBLISHED,
             publishedAt: new Date(),
             assets: {
                 create: [
-                    { language: 'en', variant: AssetVariant.PORTRAIT, assetType: LessonAssetType.THUMBNAIL, url: 'https://images.unsplash.com/photo-1517849645529-1783354bd843?w=400&h=600&fit=crop' },
-                    { language: 'en', variant: AssetVariant.LANDSCAPE, assetType: LessonAssetType.THUMBNAIL, url: 'https://images.unsplash.com/photo-1517849645529-1783354bd843?w=600&h=400&fit=crop' },
+                    {
+                        language: 'en',
+                        variant: AssetVariant.PORTRAIT,
+                        assetType: LessonAssetType.THUMBNAIL,
+                        url: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee',
+                    },
+                    {
+                        language: 'en',
+                        variant: AssetVariant.LANDSCAPE,
+                        assetType: LessonAssetType.THUMBNAIL,
+                        url: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee',
+                    },
                 ],
             },
         },
     });
 
-    console.log('✅ Seed processing finished.');
+    console.log('✅ Seed completed successfully');
 }
 
 main()
-    .catch((e) => {
-        console.error(e);
-        process.exit(1);
-    })
+    .catch(console.error)
     .finally(async () => {
         await prisma.$disconnect();
     });

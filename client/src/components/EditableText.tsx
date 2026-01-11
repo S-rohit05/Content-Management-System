@@ -13,12 +13,13 @@ interface EditableTextProps {
 export const EditableText: React.FC<EditableTextProps> = ({
     value,
     placeholder = "Add text...",
-    isEditing,
+    isEditing: canEdit, // Renamed for clarity, implies permission
     onSave,
     className,
     rows = 2
 }) => {
     const [localValue, setLocalValue] = useState(value);
+    const [mode, setMode] = useState<'view' | 'edit'>('view');
     const [status, setStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
     useEffect(() => {
@@ -36,44 +37,61 @@ export const EditableText: React.FC<EditableTextProps> = ({
         if (localValue !== value) {
             setStatus('saving');
             onSave(localValue);
-            // Assume save is fast/optimistic? 
-            // Better to wait for parent? simpler: show saved shortly after formatting
             setTimeout(() => setStatus('saved'), 500);
         }
+        setMode('view');
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            e.currentTarget.blur();
+            handleSave(); // Trigger blur/save logic
         }
     };
 
-    if (!isEditing) {
+    if (mode === 'view') {
         return (
-            <p className={clsx("whitespace-pre-wrap text-slate-400", className)}>
-                {value || <span className="italic opacity-50">No content.</span>}
-            </p>
+            <div
+                onClick={() => canEdit && setMode('edit')}
+                className={clsx(
+                    "whitespace-pre-wrap transition-colors duration-200 border border-transparent rounded px-1 -ml-1",
+                    canEdit ? "cursor-pointer hover:bg-white/5 hover:border-white/5 group" : "",
+                    !value && "italic opacity-50",
+                    className
+                )}
+                title={canEdit ? "Click to edit" : undefined}
+            >
+                {value || placeholder}
+                {canEdit && <span className="opacity-0 group-hover:opacity-30 text-[10px] ml-2 font-sans">✎</span>}
+            </div>
         );
     }
 
     return (
-        <div className="relative group">
+        <div className="relative group animate-[fadeIn_0.1s_ease-out]">
             <textarea
+                autoFocus
                 className={clsx(
-                    "w-full bg-white/5 border border-white/10 rounded-lg p-3 text-slate-300 focus:outline-none focus:border-primary/50 resize-none placeholder-slate-600 transition-all font-sans leading-relaxed",
-                    className
+                    "w-full bg-slate-800 border-primary/50 text-white rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-primary shadow-lg resize-none font-inherit leading-inherit",
+                    // We don't pass 'className' here intended for text styling, 
+                    // or maybe we should? The original passed 'text-lg' etc.
+                    // Let's pass it but ensure bg/border overrides prevail.
                 )}
+                style={{
+                    fontSize: 'inherit',
+                    fontWeight: 'inherit',
+                    lineHeight: 'inherit',
+                }}
                 placeholder={placeholder}
                 rows={rows}
                 value={localValue}
                 onChange={(e) => setLocalValue(e.target.value)}
                 onBlur={handleSave}
                 onKeyDown={handleKeyDown}
+                onFocus={(e) => e.currentTarget.select()}
             />
-            <div className="absolute bottom-2 right-2 text-[10px] font-bold uppercase tracking-wider transition-opacity duration-300">
-                {status === 'saving' && <span className="text-amber-400">Saving...</span>}
-                {status === 'saved' && <span className="text-emerald-400">Saved</span>}
+            <div className="absolute -bottom-5 right-0 text-[9px] font-bold uppercase tracking-wider bg-black/50 px-1 rounded text-slate-400">
+                Enter to save
             </div>
         </div>
     );

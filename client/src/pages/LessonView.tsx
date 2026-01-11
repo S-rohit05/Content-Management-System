@@ -6,7 +6,7 @@ import clsx from 'clsx';
 import { useAuth } from '../context/AuthContext';
 import { EditableText } from '../components/EditableText';
 import { formatDuration } from '../lib/utils';
-// import { AssetUploader } from '../components/AssetUploader'; // Unused
+import { getLessonThumbnail } from '../lib/assetHelpers';
 
 export const LessonView: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -149,10 +149,27 @@ export const LessonView: React.FC = () => {
                                 allowFullScreen
                             />
                         ) : (
-                            <div className="flex flex-col items-center justify-center h-full text-slate-500">
-                                <span className="text-4xl mb-4">📺</span>
-                                <p>No content available for this language.</p>
-                            </div>
+                            // Fallback to Landscape Thumbnail if no video content
+                            (() => {
+                                const thumbUrl = getLessonThumbnail(lesson, 'LANDSCAPE', selectedLanguage);
+                                if (thumbUrl) {
+                                    return (
+                                        <div className="w-full h-full relative">
+                                            <img src={thumbUrl} alt={lesson.title} className="w-full h-full object-cover opacity-50" />
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                                <span className="text-4xl mb-4 drop-shadow-xl">📺</span>
+                                                <p className="text-white drop-shadow-md font-bold">Content coming soon</p>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                return (
+                                    <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                                        <span className="text-4xl mb-4">📺</span>
+                                        <p>No content available for this language.</p>
+                                    </div>
+                                );
+                            })()
                         )}
                     </div>
 

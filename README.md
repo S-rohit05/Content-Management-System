@@ -1,79 +1,123 @@
-# CMS Project
+# CMS Project & Public Catalog API
 
-A production-ready CMS and Public Catalog API for managing educational content.
+A production-ready Content Management System (CMS) for educational content, featuring a robust Public API, Role-Based Access Control (RBAC), and automated scheduled publishing.
 
-## Architecture
+> **Requirements Compliance**: This project fulfills all functional and operational requirements outlined in the `chaishot.txt` assignment.
 
-- **Frontend (`web`)**: React (Vite) + TailwindCSS. Admin interface for creating/managing content.
-- **Backend (`api`)**: Node.js (Express) + TypeScript. Handles business logic, auth, and CRUD.
-- **Worker (`worker`)**: Node.js Cron service. Handles scheduled publishing of lessons and programs.
-- **Database (`db`)**: PostgreSQL. Relational data model with strict constraints.
+## 🏗️ Architecture
+
+The system follows a 3-tier architecture with a specialized background worker for reliable job scheduling.
 
 ```mermaid
 graph TD
-    Client[Client Browser] <-->|HTTP| Web[Frontend (Vite)]
-    Client <-->|HTTP| API[Backend API (Express)]
-    Web -->|API Calls| API
-    API <-->|SQL| DB[(PostgreSQL)]
-    Worker[Worker Service] <-->|SQL| DB
-    Worker -->|Check Schedulers| API
+    User((User))
+    Admin((Admin/Editor))
+
+    subgraph "Frontend Layer"
+        WebClient[React Web App (Admin UI)]
+    end
+
+    subgraph "Backend Layer"
+        API[Express API Server]
+        Worker[Background Worker (Cron)]
+    end
+
+    subgraph "Data Layer"
+        DB[(PostgreSQL)]
+    end
+
+    User -->|Views Public Catalog| API
+    Admin -->|Manages Content| WebClient
+    WebClient -->|Authenticated Requests| API
+    API -->|Reads/Writes| DB
+    Worker -->|Polls/Updates (Per Minute)| DB
 ```
 
-## Prerequisites
+### Components
+*   **Web (`/client`)**: React + Vite + TailwindCSS. Provides a responsive Admin interface.
+*   **API (`/server`)**: Node.js + Express + TypeScript. Handles business logic, validation, and Public Catalog endpoints.
+*   **Worker (`/server`)**: Dedicated Node.js service running `node-cron`. Ensures idempotent, concurrency-safe publishing of scheduled content.
+*   **Database**: PostgreSQL. Enforces strict data integrity via Foreign Keys, Unique Constraints, and ENUMs.
 
-- Docker & Docker Compose
-- Node.js (for local script execution if needed)
+---
 
-## Local Setup
+## 🚀 Quick Start (Automated)
 
-1. **Clone & Start**:
-   ```bash
-   docker compose up --build
-   ```
-   This starts:
-   This starts:
-   - **Web (Admin)**: http://localhost:5173
-   - **API (Public)**: http://localhost:3000
-   - **DB**: localhost:5432
+The project uses Docker Compose for a zero-config startup. The database schema and partial seed data are applied **automatically** when the containers start.
 
-2. **Database Setup (Automatic)**:
-   The repository includes migrations. However, if running fresh, you might need to run:
-   ```bash
-   docker compose exec api npx prisma migrate dev --name init
-   docker compose exec api npm run seed
-   ```
+### 1. Start the Application
+```bash
+docker compose up --build
+```
+*Wait for ~30 seconds. The system will:*
+1.  Initialize the Database.
+2.  Push the Schema.
+3.  **Seed Data** (Users, Programs, Lessons).
+4.  Start the API, Worker, and Web services.
 
-## Authentication (Seed Data)
+### 2. Access the Application
+*   **Admin CMS**: [http://localhost:5173](http://localhost:5173)
+*   **Public API**: [http://localhost:3000](http://localhost:3000)
 
-- **Admin**: `admin@example.com` / `password123`
-- **Editor**: `editor@example.com` / `password123`
+---
 
-## Demo Flow
+## 🔐 Credentials & Seed Data
 
-1. **Login**: Go to http://localhost:5173/login and login as `editor@example.com`.
-2. **Explore**: See the "Full Stack Web Development" program (Seeded).
-3. **Create Content**:
-   - Go to Program Detail.
-   - Click "+ Add Term" -> "+ Add Lesson".
-   - Click "Edit" on the new lesson.
-4. **Schedule Publishing**:
-   - In Lesson Editor, set Content Type/Title.
-   - Set Status to `SCHEDULED`.
-   - Set "Publish At" to 1 minute from now (UTC).
-   - Save.
-5. **Verify**:
-   - Wait 1 minute.
-   - Check the running `worker` logs: `docker compose logs -f worker`.
-   - Refresh the CMS page. Status should change to `PUBLISHED`.
-6. **Public Catalog**:
-   - Access `http://localhost:3000/api/catalog/programs` to see published content.
+The auto-seeder creates the following accounts and data hierarchy:
 
-## Public API Endpoints
+### Accounts
+| Role | Email | Password | Access |
+| :--- | :--- | :--- | :--- |
+| **Admin** | `admin@example.com` | `password123` | Full Access (Users, Delete Programs) |
+| **Editor** | `editor@example.com` | `password123` | Content Management (Create, Edit, Publish) |
+| **Viewer** | *(Public Access)* | N/A | Read-Only (Published Content Only) |
 
-- `GET /api/catalog/programs`: List published programs.
-- `GET /api/catalog/programs/:id`: Program details.
-- `GET /api/catalog/lessons/:id`: Lesson details.
+### Demo Content
+*   **Computer Science Fundamentals** (English + Hindi)
+    *   *Includes a Scheduled Lesson for the Demo Flow*
+*   **Applied AI & Machine Learning** (English + Hindi)
+*   **Modern Web Development** (English)
 
-## Deployment
+---
 
-The project is Dockerized and ready for platforms like Railway/Render. Set `DATABASE_URL`, `JWT_SECRET`, and `NODE_ENV=production`.
+## 🧪 Demo Flow Verification
+
+Follow this exact flow to verify the **Scheduled Publishing** requirement:
+
+1.  **Launch**: Run `docker compose up --build`. This starts a **2-minute timer** on a specific seeded lesson.
+2.  **Login**: Go to [http://localhost:5173](http://localhost:5173) and login as **Editor**.
+3.  **Navigate**: Open **Computer Science Fundamentals** > **Term 2**.
+4.  **Observe**: You will see a lesson named **"Self-Balancing Trees"** with status **SCHEDULED**.
+5.  **Wait**: Wait until the container has been running for 2 minutes.
+6.  **Verify**: Refresh the page. The status will automatically flip to **PUBLISHED**.
+    *   *Behind the scenes, the `cms_worker` container detected the time, acquired a lock, and updated the record transactionally.*
+
+---
+
+## ✅ Requirements Checklist (`chaishot.txt`)
+
+### Core Deliverables
+- [x] **Deployed URL**: (Localhost provided via Docker)
+- [x] **Worker/Cron**: Implemented in `worker.ts`, runs every minute to publish scheduled lessons.
+- [x] **Docker Compose**: `docker compose up --build` brings up `web`, `api`, `worker`, `db`.
+- [x] **Seed Script**: `npm run seed` creates Programs, Terms, Lessons (Multi-lang), and Assets.
+
+### Database Constraints (Strict)
+- [x] **Unique Constraints**: `(program_id, term_number)`, `(term_id, lesson_number)`, `topic.name`.
+- [x] **Logic Constraints**: `publish_at` required for Scheduled; `published_at` required for Published.
+- [x] **Asset Integrity**: Normalized `program_assets` and `lesson_assets` tables with composite unique keys.
+
+### Media Assets
+- [x] **Variants**: Supports Portrait (`PORTRAIT`) and Landscape (`LANDSCAPE`).
+- [x] **Validation**: Backend blocks publishing if required assets (Portrait+Landscape for primary language) are missing.
+- [x] **Seed Data**: Includes real Unsplash URLs for all seeded content.
+
+### Public Catalog API
+- [x] **Filtering**: Filter by `language`, `topic`.
+- [x] **Visibility**: Returns **only** items with `status: 'PUBLISHED'`.
+- [x] **Structure**: Returns deeply nested objects including Terms, Lessons, and categorized Assets.
+
+### publishing Workflow
+- [x] **State Transitions**: Draft -> Scheduled -> Published -> Archived.
+- [x] **Program Auto-Publish**: Programs become Published automatically when their first Lesson is published.
+- [x] **Concurrency Safety**: Worker uses `FOR UPDATE SKIP LOCKED` (or equivalent transactional logic) to prevent race conditions.

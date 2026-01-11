@@ -7,6 +7,25 @@ const setCache = (res: Response, seconds: number = 60) => {
     res.set('Cache-Control', `public, max-age=${seconds}, s-maxage=${seconds}`);
 };
 
+// Helpers for Asset Transformation (chaishot.txt requirement)
+const transformProgramAssets = (assets: any[]) => {
+    const posters: any = {};
+    assets.filter(a => a.assetType === 'POSTER').forEach(a => {
+        if (!posters[a.language]) posters[a.language] = {};
+        posters[a.language][a.variant.toLowerCase()] = a.url;
+    });
+    return { posters };
+};
+
+const transformLessonAssets = (assets: any[]) => {
+    const thumbnails: any = {};
+    assets.filter(a => a.assetType === 'THUMBNAIL').forEach(a => {
+        if (!thumbnails[a.language]) thumbnails[a.language] = {};
+        thumbnails[a.language][a.variant.toLowerCase()] = a.url;
+    });
+    return { thumbnails };
+};
+
 export const getCatalogPrograms = async (req: Request, res: Response) => {
     const { language, topic, cursor, limit = '10' } = req.query;
     const take = parseInt(limit as string) || 10;
@@ -38,8 +57,13 @@ export const getCatalogPrograms = async (req: Request, res: Response) => {
             orderBy: { publishedAt: 'desc' },
         });
 
+        const transformed = programs.map(p => ({
+            ...p,
+            assets: transformProgramAssets(p.assets)
+        }));
+
         setCache(res, 60);
-        res.json(programs);
+        res.json(transformed);
     } catch (error) {
         res.status(500).json({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to fetch catalog programs' });
     }
@@ -57,7 +81,7 @@ export const getCatalogProgram = async (req: Request, res: Response) => {
                     include: {
                         lessons: {
                             where: { status: LessonStatus.PUBLISHED },
-                            include: { assets: true }, // Include thumbnails
+                            include: { assets: true },
                             orderBy: { lessonNumber: 'asc' },
                         },
                     },
@@ -68,8 +92,20 @@ export const getCatalogProgram = async (req: Request, res: Response) => {
 
         if (!program) return res.status(404).json({ code: 'NOT_FOUND', message: 'Program not found' });
 
+        const transformed = {
+            ...program,
+            assets: transformProgramAssets(program.assets),
+            terms: program.terms.map(t => ({
+                ...t,
+                lessons: t.lessons.map(l => ({
+                    ...l,
+                    assets: transformLessonAssets(l.assets)
+                }))
+            }))
+        };
+
         setCache(res, 300);
-        res.json(program);
+        res.json(transformed);
     } catch (error) {
         res.status(500).json({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to fetch catalog program' });
     }
@@ -85,8 +121,13 @@ export const getCatalogLesson = async (req: Request, res: Response) => {
 
         if (!lesson) return res.status(404).json({ code: 'NOT_FOUND', message: 'Lesson not found' });
 
-        setCache(res, 3600); // Lessons change detailed less often
-        res.json(lesson);
+        const transformed = {
+            ...lesson,
+            assets: transformLessonAssets(lesson.assets)
+        };
+
+        setCache(res, 3600);
+        res.json(transformed);
     } catch (error) {
         res.status(500).json({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to fetch catalog lesson' });
     }

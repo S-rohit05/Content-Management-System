@@ -23,7 +23,7 @@ export const updateProgramSchema = z.object({
         assets: z.array(z.object({
             language: z.string().length(2),
             variant: z.nativeEnum(AssetVariant),
-            url: z.string().url(),
+            url: z.string().url().refine(val => !val.startsWith('data:'), "File upload required (Base64 not allowed)"),
         })).optional(),
     }),
 });
@@ -31,8 +31,19 @@ export const updateProgramSchema = z.object({
 export const getPrograms = async (req: Request, res: Response) => {
     const { status, language, topic } = req.query;
 
+    const user = (req as any).user;
+    const isViewer = user?.role === 'VIEWER';
+
     const where: any = {};
-    if (status) where.status = status;
+
+    // Default filter for Viewers: Must be PUBLISHED
+    if (isViewer) {
+        where.status = 'PUBLISHED';
+    } else if (status) {
+        // Admins/Editors can filter by status
+        where.status = status;
+    }
+
     if (language) where.languagePrimary = language;
     if (topic) where.topics = { some: { name: topic as string } };
 
@@ -184,5 +195,15 @@ export const updateProgram = async (req: Request, res: Response) => {
             return res.status(400).json({ code: 'VALIDATION_ERROR', message: error.message.replace('VALIDATION_ERROR: ', '') });
         }
         res.status(500).json({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to update program' });
+    }
+};
+
+export const deleteProgram = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    try {
+        await prisma.program.delete({ where: { id } });
+        res.json({ message: 'Program deleted' });
+    } catch (error) {
+        res.status(500).json({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to delete program' });
     }
 };

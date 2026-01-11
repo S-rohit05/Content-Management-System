@@ -24,7 +24,18 @@ export const LessonEditor: React.FC = () => {
             queryClient.invalidateQueries({ queryKey: ['lesson', id] });
             alert('Saved!');
         },
-        onError: (err: any) => alert(err.response?.data?.message || 'Error saving'),
+        onError: (err: any) => {
+            const message = err.response?.data?.message || 'Error saving';
+            const details = err.response?.data?.details;
+
+            if (details && Array.isArray(details)) {
+                // If we have specific field errors, show them
+                const detailMessages = details.map((d: any) => `${d.path.join('.')}: ${d.message}`).join('\n');
+                alert(`${message}\n\n${detailMessages}`);
+            } else {
+                alert(message);
+            }
+        },
     });
 
     const { register, handleSubmit, watch, setValue } = useForm({
@@ -73,13 +84,22 @@ export const LessonEditor: React.FC = () => {
         // Note: Assets are excluded from payload to prevent schema validation errors
         // (The UI for assets is currently read-only/placeholder) <-- This comment is outdated, we ARE sending assets.
         if (data.assets && Array.isArray(data.assets)) {
-            payload.assets = data.assets
-                .filter((a: any) => a.url && a.url.trim().length > 0) // Filter empty URLs
-                .map((a: any) => ({
-                    language: a.language,
-                    variant: a.variant,
-                    url: a.url
-                }));
+            const validAssets = data.assets.filter((a: any) => {
+                const url = a.url?.trim();
+                // Filter empty and Base64 URLs
+                return url && url.length > 0 && !url.startsWith('data:');
+            });
+
+            if (validAssets.length < data.assets.filter((a: any) => a.url?.trim().length > 0).length) {
+                // Optional: We could notify the user here, but for "ASAP" fix we'll just sanitize it.
+                console.warn('Filtered out Base64 assets');
+            }
+
+            payload.assets = validAssets.map((a: any) => ({
+                language: a.language,
+                variant: a.variant,
+                url: a.url
+            }));
         }
 
         updateMutation.mutate(payload);
@@ -127,6 +147,15 @@ export const LessonEditor: React.FC = () => {
                                     <div className="col-span-1 space-y-2">
                                         <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide ml-1">Number</label>
                                         <input type="number" {...register('lessonNumber', { valueAsNumber: true })} className="input-field text-center font-mono" disabled={!['ADMIN', 'EDITOR'].includes(user?.role || '')} />
+                                    </div>
+                                    <div className="col-span-4 space-y-2">
+                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide ml-1">Description</label>
+                                        <textarea
+                                            {...register('description')}
+                                            className="input-field min-h-[80px]"
+                                            disabled={!['ADMIN', 'EDITOR'].includes(user?.role || '')}
+                                            placeholder="Add a brief description..."
+                                        />
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-5">

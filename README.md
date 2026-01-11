@@ -11,15 +11,15 @@ The system follows a 3-tier architecture with a specialized background worker fo
 ```mermaid
 graph TD
     User((User))
-    Admin((Admin/Editor))
+    Admin(("Admin/Editor"))
 
     subgraph "Frontend Layer"
-        WebClient[React Web App (Admin UI)]
+        WebClient["React Web App (Admin UI)"]
     end
 
     subgraph "Backend Layer"
-        API[Express API Server]
-        Worker[Background Worker (Cron)]
+        API["Express API Server"]
+        Worker["Background Worker (Cron)"]
     end
 
     subgraph "Data Layer"

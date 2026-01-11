@@ -1,0 +1,161 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum ProgramStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum LessonStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ContentType {
+  VIDEO
+  ARTICLE
+}
+
+enum AssetVariant {
+  PORTRAIT
+  LANDSCAPE
+  SQUARE
+  BANNER
+}
+
+enum ProgramAssetType {
+  POSTER
+}
+
+enum LessonAssetType {
+  THUMBNAIL
+  SUBTITLE
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  role      Role     @default(VIEWER)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Topic {
+  id       String    @id @default(uuid())
+  name     String    @unique
+  programs Program[] // Implicit M2M
+
+  @@map("topics")
+}
+
+model Program {
+  id                 String         @id @default(uuid())
+  title              String
+  description        String?
+  languagePrimary    String         @map("language_primary")
+  languagesAvailable String[]       @map("languages_available")
+  status             ProgramStatus  @default(DRAFT)
+  publishedAt        DateTime?      @map("published_at")
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+  
+  topics             Topic[]
+  terms              Term[]
+  assets             ProgramAsset[]
+
+  @@index([status, languagePrimary, publishedAt])
+  @@map("programs")
+}
+
+model Term {
+  id         String   @id @default(uuid())
+  programId  String   @map("program_id")
+  termNumber Int      @map("term_number")
+  title      String?
+  description String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  
+  program    Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  lessons    Lesson[]
+
+  @@unique([programId, termNumber])
+  @@map("terms")
+}
+
+model Lesson {
+  id                      String   @id @default(uuid())
+  termId                  String   @map("term_id")
+  lessonNumber            Int      @map("lesson_number")
+  title                   String
+  description             String?
+  contentType             ContentType @map("content_type")
+  durationMs              Int?     @map("duration_ms")
+  isPaid                  Boolean  @default(false) @map("is_paid")
+  
+  contentLanguagePrimary    String   @map("content_language_primary")
+  contentLanguagesAvailable String[] @map("content_languages_available")
+  contentUrlsByLanguage     Json     @map("content_urls_by_language") // Map<String, String>
+  
+  subtitleLanguages         String[] @default([]) @map("subtitle_languages")
+  subtitleUrlsByLanguage    Json?    @map("subtitle_urls_by_language") // Map<String, String>
+
+  status      LessonStatus @default(DRAFT)
+  publishAt   DateTime?    @map("publish_at")
+  publishedAt DateTime?    @map("published_at")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  term   Term          @relation(fields: [termId], references: [id], onDelete: Cascade)
+  assets LessonAsset[]
+
+  @@unique([termId, lessonNumber])
+  @@index([status, publishAt])
+  @@map("lessons")
+}
+
+model ProgramAsset {
+  id        String           @id @default(uuid())
+  programId String           @map("program_id")
+  language  String
+  variant   AssetVariant
+  assetType ProgramAssetType @map("asset_type")
+  url       String
+
+  program Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@unique([programId, language, variant, assetType])
+  @@map("program_assets")
+}
+
+model LessonAsset {
+  id        String          @id @default(uuid())
+  lessonId  String          @map("lesson_id")
+  language  String
+  variant   AssetVariant
+  assetType LessonAssetType @map("asset_type")
+  url       String
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId, language, variant, assetType])
+  @@map("lesson_assets")
+}

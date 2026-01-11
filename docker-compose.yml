@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: cms_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: cms_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - cms_network
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "user", "-d", "cms_db" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: cms_api
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "postgresql://user:password@db:5432/cms_db?schema=public"
+      PORT: 3000
+      JWT_SECRET: "supersecretdevkey"
+      NODE_ENV: "development"
+    command: npm run dev
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+    networks:
+      - cms_network
+
+  worker:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: cms_worker
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://user:password@db:5432/cms_db?schema=public"
+      NODE_ENV: "development"
+    command: npm run dev:worker
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+    networks:
+      - cms_network
+
+  web:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: cms_web
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: "http://localhost:3000/api"
+    command: npm run dev -- --host
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+    networks:
+      - cms_network
+
+volumes:
+  db_data:
+
+
+networks:
+  cms_network:

@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@theme {
+    --color-background: #0f172a;
+    --color-surface: #1e293b;
+    --color-primary: #38bdf8;
+    --color-secondary: #818cf8;
+    --color-accent: #f472b6;
+
+    --font-sans: "Inter", sans-serif;
+
+    --animate-fadeIn: fadeIn 0.5s ease-out;
+    --animate-fade-in: fadeIn 0.5s ease-out;
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+}
+
+@layer base {
+    body {
+        @apply bg-background text-slate-100 font-sans antialiased min-h-screen selection:bg-primary/30;
+    }
+}
+
+@layer utilities {
+    .glass-panel {
+        @apply bg-surface/50 backdrop-blur-md border border-white/5 shadow-xl;
+    }
+
+    .glass-card {
+        @apply bg-surface/40 backdrop-blur-sm border border-white/5 hover:bg-surface/60 transition-all duration-300;
+    }
+
+    .input-field {
+        @apply w-full bg-surface/50 border border-slate-700 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all placeholder:text-slate-500;
+    }
+
+    .btn-primary {
+        @apply bg-primary hover:bg-sky-400 text-slate-900 font-semibold px-6 py-2.5 rounded-lg transition-all active:scale-95 shadow-lg shadow-primary/20;
+    }
+}
